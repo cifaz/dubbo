@@ -18,7 +18,6 @@ package org.apache.dubbo.configcenter.support.zookeeper;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.ExtensionLoader;
-import org.apache.dubbo.common.utils.NetUtils;
 import org.apache.dubbo.configcenter.ConfigChangeEvent;
 import org.apache.dubbo.configcenter.ConfigurationListener;
 import org.apache.dubbo.configcenter.DynamicConfiguration;
@@ -43,33 +42,39 @@ import java.util.concurrent.CountDownLatch;
 public class ZookeeperDynamicConfigurationTest {
     private static CuratorFramework client;
 
+//    private static String zookeeperIp = "localhost";
+    private static String zookeeperIp = "192.168.18.214";
     private static URL configUrl;
-    private static int zkServerPort = NetUtils.getAvailablePort();
+    private static int zkServerPort = 2181;
     private static TestingServer zkServer;
     private static DynamicConfiguration configuration;
+    private static String configCenterNamespace = "dev";
 
     @BeforeAll
     public static void setUp() throws Exception {
         zkServer = new TestingServer(zkServerPort, true);
 
-        client = CuratorFrameworkFactory.newClient("localhost:" + zkServerPort, 60 * 1000, 60 * 1000,
+        client = CuratorFrameworkFactory.newClient(zookeeperIp + ":" + zkServerPort, 60 * 1000, 60 * 1000,
                 new ExponentialBackoffRetry(1000, 3));
         client.start();
 
         try {
-            setData("/dubbo/config/dubbo/dubbo.properties", "The content from dubbo.properties");
-            setData("/dubbo/config/group*service:version/configurators", "The content from configurators");
-            setData("/dubbo/config/appname", "The content from higer level node");
-            setData("/dubbo/config/appname/tagrouters", "The content from appname tagrouters");
-            setData("/dubbo/config/never.change.DemoService/configurators", "Never change value from configurators");
+            setData("/" + configCenterNamespace + "/config/dubbo/dubbo.properties", "The content from dubbo.properties");
+            setData("/" + configCenterNamespace + "/config/group*service:version/configurators", "The content from configurators");
+            setData("/" + configCenterNamespace + "/config/appname", "The content from higer level node");
+            setData("/" + configCenterNamespace + "/config/appname/tagrouters", "The content from appname tagrouters");
+            setData("/" + configCenterNamespace + "/config/never.change.DemoService/configurators", "Never change value from configurators");
+            setData("/" + configCenterNamespace + "/config/appname/condition", "app condition route");
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+        configUrl = URL.valueOf("zookeeper://" + zookeeperIp + ":" + zkServerPort + "/ConfigCenterConfig?namespace=" + configCenterNamespace);
 
-        configUrl = URL.valueOf("zookeeper://localhost:" + zkServerPort);
-
-        configuration = ExtensionLoader.getExtensionLoader(DynamicConfigurationFactory.class).getExtension(configUrl.getProtocol()).getDynamicConfiguration(configUrl);
+        configuration = ExtensionLoader
+                .getExtensionLoader(DynamicConfigurationFactory.class)
+                .getExtension(configUrl.getProtocol())
+                .getDynamicConfiguration(configUrl);
     }
 
     @AfterAll
@@ -92,22 +97,29 @@ public class ZookeeperDynamicConfigurationTest {
 
     @Test
     public void testAddListener() throws Exception {
-        CountDownLatch latch = new CountDownLatch(4);
+        CountDownLatch latch = new CountDownLatch(6);
         TestListener listener1 = new TestListener(latch);
         TestListener listener2 = new TestListener(latch);
         TestListener listener3 = new TestListener(latch);
         TestListener listener4 = new TestListener(latch);
+        TestListener listener5 = new TestListener(latch);
+        TestListener listener6 = new TestListener(latch);
         configuration.addListener("group*service:version.configurators", listener1);
         configuration.addListener("group*service:version.configurators", listener2);
         configuration.addListener("appname.tagrouters", listener3);
         configuration.addListener("appname.tagrouters", listener4);
+        configuration.addListener("appname.condition", listener5);
+        configuration.addListener("appname.condition", listener6);
 
-        setData("/dubbo/config/group*service:version/configurators", "new value1");
+        setData("/" + configCenterNamespace + "/config/group*service:version/configurators", "new value1");
         Thread.sleep(100);
-        setData("/dubbo/config/appname/tagrouters", "new value2");
+        setData("/" + configCenterNamespace + "/config/appname/tagrouters", "new value2");
         Thread.sleep(100);
-        setData("/dubbo/config/appname", "new value3");
+        setData("/" + configCenterNamespace + "/config/appname", "new value3");
+        Thread.sleep(100);
+        setData("/" + configCenterNamespace + "/config/appname/condition", "new value4");
 
+        System.out.println("set data complete ......");
         Thread.sleep(5000);
 
         latch.await();
@@ -115,11 +127,15 @@ public class ZookeeperDynamicConfigurationTest {
         Assertions.assertEquals(1, listener2.getCount("group*service:version.configurators"));
         Assertions.assertEquals(1, listener3.getCount("appname.tagrouters"));
         Assertions.assertEquals(1, listener4.getCount("appname.tagrouters"));
+        Assertions.assertEquals(1, listener5.getCount("appname.condition"));
+        Assertions.assertEquals(1, listener6.getCount("appname.condition"));
 
         Assertions.assertEquals("new value1", listener1.getValue());
         Assertions.assertEquals("new value1", listener2.getValue());
         Assertions.assertEquals("new value2", listener3.getValue());
         Assertions.assertEquals("new value2", listener4.getValue());
+        Assertions.assertEquals("new value4", listener5.getValue());
+        Assertions.assertEquals("new value4", listener6.getValue());
     }
 
     private class TestListener implements ConfigurationListener {
