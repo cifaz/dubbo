@@ -19,6 +19,7 @@ package org.apache.dubbo.configcenter;
 public interface Constants {
     String CONFIG_CLUSTER_KEY = "config.cluster";
     String CONFIG_NAMESPACE_KEY = "config.namespace";
+    String CONFIG_ZOOKEEPER_NAMESPACE_KEY = "namespace";
     String CONFIG_GROUP_KEY = "config.group";
     String CONFIG_CHECK_KEY = "config.check";
 }

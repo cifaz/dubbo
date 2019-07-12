@@ -31,7 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-import static org.apache.dubbo.configcenter.Constants.CONFIG_NAMESPACE_KEY;
+import static org.apache.dubbo.configcenter.Constants.CONFIG_ZOOKEEPER_NAMESPACE_KEY;
 
 /**
  *
@@ -51,7 +51,7 @@ public class ZookeeperDynamicConfiguration implements DynamicConfiguration {
 
     ZookeeperDynamicConfiguration(URL url, ZookeeperTransporter zookeeperTransporter) {
         this.url = url;
-        rootPath = "/" + url.getParameter(CONFIG_NAMESPACE_KEY, DEFAULT_GROUP) + "/config";
+        rootPath = "/" + url.getParameter(CONFIG_ZOOKEEPER_NAMESPACE_KEY, DEFAULT_GROUP) + "/config";
 
         initializedLatch = new CountDownLatch(1);
         this.cacheListener = new CacheListener(rootPath, initializedLatch);
